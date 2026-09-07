@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "module": "ESNext",
+    "target": "ES2018",
+    "allowJs": true,
+    "noImplicitAny": true,
+    "moduleResolution": "node",
+    "strictNullChecks": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "lib": ["DOM", "ES2018", "ES2019"],
+    "types": ["node", "obsidian"]
+  },
+  "include": ["src/**/*.ts", "main.ts", "esbuild.config.mjs"]
+}
