@@ -86,8 +86,9 @@ obsidian-editor-breadcrumbs/
 
 1. **`SettingTab.update()` 方法名冲突**：1.13.0 起基类新增 `update(): void`，并且
    `addSettingTab()` 会调用它。任何插件设置页如果自定义了 `update(data)`，会被 Obsidian
-   以**无参数**调用，极易把 `plugin.settings = undefined`。本仓库的设置页方法命名为
-   `applySettingsUpdate`。sticky headings 原版/无闪烁 fork 就是栽在这里（已修复并验证）。
+   以**无参数**调用，极易把 `plugin.settings = undefined`。本仓库的设置页**没有**任何
+   `update()` 类方法（各设置项在 onChange 回调里直接 `saveSettings()`，天然避开）。
+   sticky headings 原版/无闪烁 fork 就是栽在这里（已修复并验证）。
 2. **阅读模式虚拟化**：DOM 只有窗口片段（本例 74 个标题只剩 7 个），不能按 DOM 计算全链，
    见上文 trail 算法。`renderer.sections`（575 节，含 `lines` 起始行、`height`）仍在，
    可作为备用信息源。
