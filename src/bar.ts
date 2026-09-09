@@ -191,6 +191,20 @@ export class BreadcrumbBar {
 
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     menu.showAtPosition({ x: rect.left, y: rect.bottom + 4 });
+    // Obsidian's own placement right-aligns the menu against the crumb's left
+    // edge when a left-aligned menu would overflow the viewport. VS Code
+    // opens menus left-aligned under the clicked item instead, and pins the
+    // overflowing side to the window edge. `dom` is a runtime field Menu
+    // creates in its constructor; it is just missing from the public typings.
+    // showAtPosition sets `left` synchronously, so correcting it in this same
+    // task happens before paint.
+    if ('dom' in menu) {
+      const dom = menu.dom;
+      if (dom instanceof HTMLElement) {
+        const vw = dom.ownerDocument.body.clientWidth;
+        dom.style.left = `${Math.max(0, Math.min(rect.left, vw - dom.offsetWidth))}px`;
+      }
+    }
   }
 
   private jumpToHeading(crumb: Crumb) {
