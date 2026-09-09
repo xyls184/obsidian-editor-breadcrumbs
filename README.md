@@ -13,6 +13,8 @@ A breadcrumb bar sits at the top of the editor pane, following the cursor (edit 
 
 > Requires Obsidian **1.13.0+**, desktop.
 
+> **Not affiliated with [Breadcrumbs](https://github.com/michaelpporter/breadcrumbs).** This is an independent plugin and is not related to, endorsed by, or derived from the Breadcrumbs plugin.
+
 ## Features
 
 - Real-time trail: follows the cursor in edit mode, follows scrolling in reading mode — including long, virtualized documents.
@@ -52,7 +54,7 @@ Download these **three files**: `main.js`, `manifest.json`, `styles.css` (from t
 <vault>/.obsidian/plugins/editor-breadcrumbs/
 ```
 
-Create the folder if it does not exist. Then in Obsidian: **Settings → Community plugins → enable "Editor Breadcrumbs"** (turn off Restricted mode first if prompted).
+Create the folder by yourself. Then in Obsidian: **Settings → Community plugins → enable "Editor Breadcrumbs"** (turn off Restricted mode first if prompted).
 
 ### Option B — Install via BRAT
 
@@ -85,6 +87,8 @@ VS Code 风格的 Obsidian 编辑器面包屑导航：
 编辑区顶部常驻一条面包屑栏，编辑模式**跟随光标**、阅读模式**跟随滚动**，只显示**当前标题链**（每级只出现当前所在的那个标题）。
 
 > 需要 Obsidian **1.13.0+**，桌面版。
+
+> **与 [Breadcrumbs](https://github.com/michaelpporter/breadcrumbs) 插件无关**：本插件是独立项目，与 Breadcrumbs 插件没有任何关联，也不是它的衍生版本。
 
 ## 功能
 
