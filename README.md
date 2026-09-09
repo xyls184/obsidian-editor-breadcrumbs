@@ -1,3 +1,6 @@
+Developed with AI assistance (glm-5.3-flash). · 本插件在 AI（glm-5.3-flash）辅助下编写。
+中文说明在下方。
+
 # Editor Breadcrumbs
 
 VS Code style breadcrumbs for the Obsidian editor:
@@ -38,6 +41,8 @@ A breadcrumb bar sits at the top of the editor pane, following the cursor (edit 
 | Hide when there are no headings | off | Hide the bar entirely for notes without headings |
 
 ## Installation
+
+Currently waiting for the Obsidian store to approve the submission; in the meantime, manual installation is the only option.
 
 ### Option A — Download the pre-built files (no build needed)
 
@@ -110,6 +115,8 @@ VS Code 风格的 Obsidian 编辑器面包屑导航：
 
 ## 安装
 
+正在等待obsidian商店通过审核，在此之前只能手动安装
+
 ### 方式 A —— 下载预编译文件（无需编译）
 
 下载这三个文件：`main.js`、`manifest.json`、`styles.css`（在本仓库根目录或 Releases 页面），复制到：
@@ -118,7 +125,7 @@ VS Code 风格的 Obsidian 编辑器面包屑导航：
 <库路径>/.obsidian/plugins/editor-breadcrumbs/
 ```
 
-文件夹不存在就手动创建。然后在 Obsidian 中：**设置 → 第三方插件 → 启用 "Editor Breadcrumbs"**（如提示受限模式请先关闭）。
+文件夹需要手动创建。然后在 Obsidian 中：**设置 → 第三方插件 → 启用 "Editor Breadcrumbs"**（如提示受限模式请先关闭）。
 
 ### 方式 B —— 通过 BRAT 安装
 
@@ -140,8 +147,4 @@ npx tsc --noEmit  # 可选：类型检查
 
 ---
 
-## Credits / 声明
-
-Developed with AI assistance (glm-5.3-flash). · 本插件在 AI（glm-5.3-flash）辅助下编写。
-
-License: CC0-1.0 · Architecture & development notes: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)（中文）
+License: CC0-1.0
