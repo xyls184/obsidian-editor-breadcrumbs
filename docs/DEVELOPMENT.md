@@ -238,8 +238,17 @@ obsidian restart
 - `minAppVersion: 1.13.0`：阅读模式行号链与官方跳转路径依赖 1.13 虚拟化 renderer 内部
   （`renderer.getScroll/applyScroll`），更低版本未验证、不承诺。
 - `isDesktopOnly: true`：只在桌面版验证过；移动端理论上同代码路径但未测，测过想放开再改。
-- 如提交 Obsidian 社区插件目录：需 README 配截图/GIF（录屏可用 Obsidian 自带或 ShareX）、
-  仓库公开、Release 附三件套，然后按 obsidian-releases 仓库的模板提 PR。
+- **提交 Obsidian 社区插件目录（2026-09-09 按官方文档核对，旧说法已过时）**：入口是
+  <https://community.obsidian.md>（Obsidian 账号登录 → 关联 GitHub → Add plugin），
+  **不再**往 obsidian-releases 仓库提 PR。仓库根目录需有 `README.md`、`LICENSE`、
+  `manifest.json`、`versions.json`；Release 的 tag 必须与 manifest 的 `version` 完全一致
+  （本插件即 `1.0.0`），并附 `main.js` / `manifest.json` / `styles.css` 三件套
+  （Obsidian 安装插件时从该 Release 拉取这三个文件）。提交后自动审查给出整改意见，
+  按意见改代码 → 升 `version` → 发新 Release 即可。manifest `description` 要求
+  ≤250 字符、句号结尾、避免 emoji/特殊字符；README 截图不是硬性要求（列表页只展示
+  README 摘要），但建议补（录屏可用 Obsidian 自带或 ShareX）。
+- 2026-09-09：推送 GitHub（远端原有网页端生成的 README/LICENSE 脚手架，由本地历史覆盖）；
+  许可证三处统一为 CC0-1.0（`LICENSE` / `package.json` / README）。
 - 本文档（DEVELOPMENT.md）含内部 API 逆向笔记，随仓库公开有助于后人，无敏感信息
   （本机路径已泛化）。
 

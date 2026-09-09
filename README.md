@@ -140,4 +140,8 @@ npx tsc --noEmit  # 可选：类型检查
 
 ---
 
-License: MIT · Architecture & development notes: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)（中文）
+## Credits / 声明
+
+Developed with AI assistance (glm-5.3-flash). · 本插件在 AI（glm-5.3-flash）辅助下编写。
+
+License: CC0-1.0 · Architecture & development notes: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)（中文）
