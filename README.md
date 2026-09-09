@@ -1,4 +1,4 @@
-Developed with AI assistance (glm-5.3-flash). · 本插件在 AI（glm-5.3-flash）辅助下编写。
+Developed with AI assistance (glm-5.3-flash & deepseek-v4.1-flash). · 本插件在 AI（glm-5.3-flash & deepseek-v4.1-flash）辅助下编写。
 中文说明在下方。
 
 # Editor Breadcrumbs
