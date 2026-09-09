@@ -3,3 +3,17 @@ data.json
 *.log
 .DS_Store
 Thumbs.db
+
+# Internal development notes: kept local, not published
+docs/
+
+# Editor / IDE configuration
+.vscode/
+.idea/
+*.iml
+
+# Sourcemaps (the production build inlines none)
+*.map
+
+# Build / release scratch files
+*.tmp.*
