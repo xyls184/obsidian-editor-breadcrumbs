@@ -65,7 +65,9 @@ export class BreadcrumbBar {
     const snapshot = [
       this.view.getMode(),
       this.view.file?.path ?? '',
-      previewEl ? `${Math.round(previewEl.scrollTop)}/${previewEl.scrollHeight}` : '',
+      // clientHeight is part of the fingerprint: the reading-mode chain reads
+      // the center line, so a resize can change the chain without any scroll.
+      previewEl ? `${Math.round(previewEl.scrollTop)}/${Math.round(previewEl.clientHeight)}/${previewEl.scrollHeight}` : '',
       cursor ? `${cursor.line}:${cursor.ch}` : '',
       this.plugin.settings.maxSegmentLength,
       this.plugin.settings.showFolderPath ? 1 : 0,

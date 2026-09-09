@@ -53,18 +53,43 @@ export function computeEditHeadingTrail(app: { metadataCache: { getFileCache(f: 
 
 /** The scrolling element of a reading view (typing-safe across app versions). */
 export function getPreviewEl(view: MarkdownView): HTMLElement | null {
-  const previewMode = view.previewMode as unknown as { renderer?: { previewEl?: HTMLElement } };
+  // Internal renderer field, absent from the public typings.
+  const previewMode = view.previewMode as unknown as PreviewModeInternals;
   if (previewMode.renderer?.previewEl) return previewMode.renderer.previewEl;
   return view.previewMode.containerEl.querySelector<HTMLElement>('.markdown-preview-view');
 }
 
+/** One section of the virtualized reading view (not in the public typings). */
+interface PreviewSection {
+  el?: HTMLElement;
+  start?: { line?: number };
+  /** Source lines covered by this section. */
+  lines?: number;
+  /** Measured pixel height; 0 until the section has been measured. */
+  height?: number;
+  computed?: boolean;
+  /** False while collapsed: hidden content takes no space but keeps its lines. */
+  shown?: boolean;
+}
+
+interface PreviewScrollOpts {
+  center?: boolean;
+  highlight?: boolean;
+}
+
 /** Internal reading-view renderer shape (not in the public typings; guarded). */
 interface PreviewRendererInternals {
-  renderer?: {
-    previewEl?: HTMLElement;
-    getScroll?: () => number | null;
-  };
+  previewEl?: HTMLElement;
+  /** Space above the first section (sizer padding). */
+  topSpace?: number;
+  sections?: PreviewSection[];
+  getScroll?: () => number | null;
+  applyScroll?: (line: number, opts?: PreviewScrollOpts) => boolean;
+  applyScrollDelayed?: (line: number, opts?: PreviewScrollOpts, done?: () => void) => void;
 }
+
+/** `view.previewMode` with its internal renderer reachable (typing-safe cast). */
+type PreviewModeInternals = { renderer?: PreviewRendererInternals };
 
 /**
  * Current reading position as a fractional *source line* — the very value the
@@ -76,7 +101,9 @@ interface PreviewRendererInternals {
  */
 export function getPreviewScrollLine(view: MarkdownView): number | null {
   try {
-    const renderer = (view.previewMode as unknown as PreviewRendererInternals | undefined)?.renderer;
+    // Internal renderer field, absent from the public typings.
+    const previewMode = view.previewMode as unknown as PreviewModeInternals | undefined;
+    const renderer = previewMode?.renderer;
     if (renderer && typeof renderer.getScroll === 'function') {
       const line = renderer.getScroll();
       if (typeof line === 'number' && Number.isFinite(line)) return line;
@@ -84,18 +111,61 @@ export function getPreviewScrollLine(view: MarkdownView): number | null {
   } catch {
     // Renderer not ready — fall through to the synced value.
   }
-  const synced = (view as unknown as { scroll?: unknown }).scroll;
+  // `view.scroll` is the renderer-synced line, absent from the public typings.
+  const viewInternals = view as unknown as { scroll?: unknown };
+  const synced = viewInternals.scroll;
   return typeof synced === 'number' && Number.isFinite(synced) ? synced : null;
 }
 
 /**
- * Slack (in lines) when deciding which heading is "current": a heading counts
- * as current once its line is within this many lines below the viewport-top
- * line. This replaces the old `scrollTop + 30px` DOM threshold. It must stay
- * < 1 line: after a jump the target line lands exactly at the viewport top
- * (offset 0), so this slack is the whole landing margin, and at exact landing
- * an adjacent heading (target line + 1) can only intrude if the slack reaches
- * a full line.
+ * Source line at a scroll offset (px from the top of the scrolled content).
+ * Mirrors the renderer's own `getScroll()` walk — sections stacked by their
+ * measured heights, collapsed sections taking no space — but evaluated at an
+ * arbitrary offset instead of the viewport top. The result is section-granular
+ * on purpose: every heading starts its own section, so the section containing
+ * the offset is exactly the one that decides which heading is current. Returns
+ * null until every section has been measured (same condition as getScroll()).
+ */
+function previewLineAtOffset(renderer: PreviewRendererInternals, y: number): number | null {
+  const sections = renderer.sections;
+  if (!Array.isArray(sections) || sections.length === 0) return null;
+  let px = typeof renderer.topSpace === 'number' ? renderer.topSpace : 0;
+  let line: number | null = null;
+  for (const section of sections) {
+    if (!section?.computed) return null;
+    if (typeof section.start?.line === 'number') line = section.start.line;
+    const height = section.shown === false ? 0 : section.height ?? 0;
+    if (y < px + height) return line;
+    px += height;
+  }
+  return line;
+}
+
+/**
+ * Source line at the vertical center of the reading view, or null when the
+ * renderer's section data is unavailable. The center — not the viewport top —
+ * is what the bar follows: a heading becomes current once it crosses the middle
+ * of the visible reading area.
+ */
+function getPreviewCenterLine(view: MarkdownView): number | null {
+  try {
+    // Internal renderer field, absent from the public typings.
+    const previewMode = view.previewMode as unknown as PreviewModeInternals | undefined;
+    const renderer = previewMode?.renderer;
+    const previewEl = renderer?.previewEl ?? getPreviewEl(view);
+    if (!renderer || !previewEl) return null;
+    return previewLineAtOffset(renderer, previewEl.scrollTop + previewEl.clientHeight / 2);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Slack (in lines) for the fallback path only, where the reading position comes
+ * from `renderer.getScroll()` (the viewport-top line) because the section data
+ * needed for the center line is not available yet. A heading counts as current
+ * once its line is within this many lines below the viewport top; it must stay
+ * < 1 line so an adjacent heading cannot intrude at an exact landing.
  */
 const PREVIEW_LINE_EPSILON = 0.75;
 
@@ -104,12 +174,12 @@ const PREVIEW_LINE_EPSILON = 0.75;
 const JUMP_CORRECT_MS = 250;
 
 /**
- * Reading mode chain. Preferred path is line-accurate and DOM-free: the
- * virtualized renderer itself maintains the current scroll position as a
- * fractional source line (`renderer.getScroll()` — the same value the outline
- * panel highlights from), so the chain is a pure metadata computation. When
- * that value is not yet available (initial progressive render), fall back to
- * locating the rendered DOM heading window via subsequence matching.
+ * Reading mode chain. Preferred path is DOM-free: the virtualized renderer
+ * keeps every section's measured height, so the source line at the vertical
+ * center of the view is a pure data computation and the chain is a metadata
+ * lookup (same line semantics as the outline panel, but read at the center
+ * instead of the viewport top). Falls back to the viewport-top line while
+ * sections are still being measured, then to the rendered DOM heading window.
  */
 export function computePreviewHeadingTrail(app: { metadataCache: { getFileCache(f: TFile): { headings?: HeadingCache[] } | null } }, view: MarkdownView): Crumb[] {
   const file = view.file;
@@ -117,6 +187,14 @@ export function computePreviewHeadingTrail(app: { metadataCache: { getFileCache(
   const metaHeadings = app.metadataCache.getFileCache(file)?.headings ?? [];
   if (metaHeadings.length === 0) return [];
 
+  const centerLine = getPreviewCenterLine(view);
+  if (centerLine != null) {
+    return headingChainFromCache(metaHeadings, centerLine).map(h => ({
+      text: stripMarkdown(h.heading),
+      kind: 'heading' as const,
+      line: h.position.start.line,
+    }));
+  }
   const scrollLine = getPreviewScrollLine(view);
   if (scrollLine != null) {
     return headingChainFromCache(metaHeadings, scrollLine + PREVIEW_LINE_EPSILON).map(h => ({
@@ -145,7 +223,8 @@ function computePreviewHeadingTrailDom(app: { metadataCache: { getFileCache(f: T
 
   const base = previewEl.getBoundingClientRect();
   const scrollTop = previewEl.scrollTop;
-  const threshold = scrollTop + 30;
+  // Same reference point as the main path: the vertical center of the view.
+  const threshold = scrollTop + previewEl.clientHeight / 2;
 
   const domHeadings = Array.from(previewEl.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6')).map(el => ({
     el,
@@ -182,8 +261,8 @@ function computePreviewHeadingTrailDom(app: { metadataCache: { getFileCache(f: T
   if (windowStart < 0) windowStart = findWindowStart(false);
   if (windowStart < 0) return [];
 
-  // The current position is the last rendered heading above the viewport top;
-  // if none qualifies, it is whatever precedes the rendered window.
+  // The current position is the last rendered heading above the viewport
+  // center; if none qualifies, it is whatever precedes the rendered window.
   let currentIndex = windowStart - 1;
   for (let di = 0; di < domHeadings.length; di++) {
     if (domHeadings[di].top <= threshold) {
@@ -255,38 +334,56 @@ function matchPreviewWindow(metaHeadings: HeadingCache[], previewEl: HTMLElement
 }
 
 /**
- * Jump to a heading in reading mode through the official internal path — the
- * exact call the outline panel makes when a heading is clicked:
- * `view.setEphemeralState({ line })` →
- * `renderer.applyScrollDelayed(line, { highlight: true }, syncScroll)`.
- * The renderer maps the line to a pixel offset from its *measured* section
- * heights (it refuses and retries once rendering settles if any height is not
- * measured yet), scrolls exactly once, flashes the target heading and syncs
- * the view's scroll state.
+ * Jump to a heading in reading mode through the renderer's official internal
+ * path: `renderer.applyScrollDelayed(line, { center: true, highlight: true },
+ * syncScroll)` — the same call Obsidian makes for search-match navigation
+ * (`view.setEphemeralState({ line })` is this minus `center`). The renderer
+ * maps the line to a pixel offset from its *measured* section heights (it
+ * refuses and retries once rendering settles if any height is not measured
+ * yet), scrolls exactly once, flashes the target and syncs the view's state.
+ *
+ * `center` matters here: the breadcrumb reads the heading at the middle of the
+ * view (getPreviewCenterLine), so centering the target makes it the deepest
+ * crumb immediately after the jump. A top-aligned landing would instead expose
+ * whatever heading happens to sit above the middle — with dense headings the
+ * clicked heading would drop out of the bar entirely.
  *
  * One correction pass follows: a long jump re-attaches the rendered section
  * window, and re-measuring those sections (margins collapse differently with
  * their new neighbours) can shift the content by ~a hundred px shortly after
- * the landing. Once that settles, `applyScroll(line)` is exact again with the
- * fresh heights (verified: repeated application lands within 0.02 lines), so
- * we simply re-apply — no observation loop. Skipped if the user scrolled away
- * in the meantime. The legacy convergence loop is kept as a fallback for
- * internal API changes.
+ * the landing. Once that settles, `applyScroll(line, { center: true })` is
+ * exact again with the fresh heights (verified: repeated application lands
+ * within 0.02 lines), so we simply re-apply — no observation loop. Skipped if
+ * the user scrolled away in the meantime (the landing line is the reference,
+ * since a centered landing does not sit at `line`). The legacy convergence
+ * loop is kept as a fallback for internal API changes.
  */
 export async function scrollToPreviewHeading(app: { metadataCache: { getFileCache(f: TFile): { headings?: HeadingCache[] } | null } }, view: MarkdownView, line: number, text?: string): Promise<void> {
   const previewEl = getPreviewEl(view);
   if (!previewEl) return;
 
-  let official = false;
-  try {
-    if (typeof view.setEphemeralState === 'function') {
-      view.setEphemeralState({ line });
-      official = true;
-    }
-  } catch {
+  // Internal renderer fields, absent from the public typings.
+  const previewMode = view.previewMode as unknown as PreviewModeInternals | undefined;
+  const renderer = previewMode?.renderer;
+  const viewInternals = view as unknown as { syncScroll?: () => void };
+  const syncScroll = viewInternals.syncScroll;
+  if (!renderer || typeof renderer.applyScrollDelayed !== 'function') {
     // Internal renderer API unavailable or changed — use the legacy loop.
+    await scrollToPreviewHeadingLegacy(app, view, line, text);
+    return;
   }
-  if (!official) {
+
+  let landed: number | null = null;
+  try {
+    renderer.applyScrollDelayed(line, { center: true, highlight: true }, () => {
+      try {
+        landed = renderer.getScroll?.() ?? null;
+        if (typeof syncScroll === 'function') syncScroll.call(view);
+      } catch {
+        // Scroll-state sync is best-effort.
+      }
+    });
+  } catch {
     await scrollToPreviewHeadingLegacy(app, view, line, text);
     return;
   }
@@ -294,13 +391,10 @@ export async function scrollToPreviewHeading(app: { metadataCache: { getFileCach
   await settle(JUMP_CORRECT_MS);
 
   // Re-land precisely now that the new section window has been re-measured.
-  const renderer = (view.previewMode as unknown as {
-    renderer?: { getScroll?: () => number | null; applyScroll?: (line: number, opts?: Record<string, never>) => boolean };
-  })?.renderer;
   try {
-    const gs = typeof renderer?.getScroll === 'function' ? renderer.getScroll() : null;
-    if (typeof gs === 'number' && Math.abs(gs - line) > 10) return; // user scrolled away
-    if (typeof renderer?.applyScroll === 'function') renderer.applyScroll(line, {});
+    const gs = renderer.getScroll?.() ?? null;
+    if (landed != null && gs != null && Math.abs(gs - landed) > 10) return; // user scrolled away
+    renderer.applyScroll?.(line, { center: true });
   } catch {
     // Keep the first-shot position; it was already close.
   }
@@ -331,7 +425,9 @@ async function scrollToPreviewHeadingLegacy(app: { metadataCache: { getFileCache
   const landOn = (el: HTMLElement) => {
     const base = previewEl.getBoundingClientRect();
     const delta = el.getBoundingClientRect().top - base.top;
-    previewEl.scrollTo({ top: previewEl.scrollTop + delta - 8, behavior: 'smooth' });
+    // Center the heading, matching the main path and the bar's reference point.
+    const centered = delta - (previewEl.clientHeight - el.offsetHeight) / 2;
+    previewEl.scrollTo({ top: previewEl.scrollTop + centered, behavior: 'smooth' });
   };
 
   for (let iter = 0; iter < 7; iter++) {

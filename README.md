@@ -17,10 +17,10 @@ A breadcrumb bar sits at the top of the editor pane, following the cursor (edit 
 
 ## Features
 
-- Real-time trail: follows the cursor in edit mode, follows scrolling in reading mode — including long, virtualized documents.
+- Real-time trail: follows the cursor in edit mode, follows scrolling in reading mode — in reading mode the current heading is the one at the middle of the view. Works on long, virtualized documents.
 - Left-click a heading crumb → the **sibling heading menu** (headings of the same level under the same parent, current one checked). Arrow-key navigation is built in.
 - Right-click a heading crumb → jump to it immediately.
-- Jumps land precisely in both modes; reading-mode jumps use Obsidian's own internal heading-scroll path.
+- Jumps land precisely in both modes; reading-mode jumps center the target and use Obsidian's own internal heading-scroll path.
 - Click a file/folder crumb → reveal the file in the file explorer.
 - Long names are truncated with an ellipsis in the bar; the sibling menu always shows full titles.
 
@@ -92,10 +92,10 @@ VS Code 风格的 Obsidian 编辑器面包屑导航：
 
 ## 功能
 
-- 路径实时更新；阅读模式同样支持（含超长虚拟化文档）。
+- 路径实时更新；阅读模式同样支持（以窗口正中为当前阅读位置，含超长虚拟化文档）。
 - 左键标题段 → 弹出**同级标题菜单**（同一父标题下同层级的兄弟标题，当前项勾选），方向键导航原生支持。
 - 右键标题段 → 直接跳转到该标题。
-- 两种模式均精确落地；阅读模式走 Obsidian 官方内部跳转路径。
+- 两种模式均精确落地；阅读模式把目标标题滚到窗口正中，走 Obsidian 官方内部跳转路径。
 - 左键/右键文件、文件夹段 → 在文件列表中定位该文件。
 - 面包屑栏里长标题截断显示 `…`；同级菜单里始终显示完整标题。
 
