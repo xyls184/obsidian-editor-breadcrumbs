@@ -1,7 +1,7 @@
 {
   "id": "editor-breadcrumbs",
   "name": "Editor Breadcrumbs",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "minAppVersion": "1.13.0",
   "description": "VS Code style breadcrumb trail (folder, file, headings) at the top of the editor, following the cursor. Click any crumb to jump.",
   "author": "Dumortierite",

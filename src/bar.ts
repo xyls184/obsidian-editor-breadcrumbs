@@ -19,8 +19,7 @@ export class BreadcrumbBar {
     this.plugin = plugin;
     this.leaf = leaf;
     this.view = view;
-    this.barEl = document.createElement('div');
-    this.barEl.addClass('eb-bar');
+    this.barEl = createDiv('eb-bar');
 
     // Capture-phase scroll listener catches both the CM scroller and the
     // reading-mode preview scroller for this leaf.
@@ -121,13 +120,14 @@ export class BreadcrumbBar {
   private revealInExplorer(target?: TFile) {
     // internalPlugins is not in the public typings
     const app = this.plugin.app as unknown as {
-      internalPlugins?: { getPluginById?: (id: string) => { instance?: unknown } | undefined };
+      internalPlugins?: {
+        getPluginById?: (id: string) => { instance?: { revealInFolder?: (f: TFile) => void } } | undefined;
+      };
     };
     const fileExplorer = app.internalPlugins?.getPluginById?.('file-explorer');
     const item = target ?? this.view.file ?? this.view.previewMode.file;
     if (!item) return;
-    (fileExplorer?.instance as unknown as { revealInFolder?: (f: TFile) => void } | undefined)
-      ?.revealInFolder?.(item);
+    fileExplorer?.instance?.revealInFolder?.(item);
   }
 
   /**
@@ -265,7 +265,7 @@ export class BreadcrumbBar {
         // VS Code style: left click opens the sibling heading menu,
         // right click jumps straight to the crumb.
         el.addEventListener('click', event => {
-          this.showSiblingMenu(crumb, event as MouseEvent);
+          this.showSiblingMenu(crumb, event);
         });
         el.addEventListener('contextmenu', event => {
           event.preventDefault();

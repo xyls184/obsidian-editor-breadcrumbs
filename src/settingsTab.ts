@@ -1,5 +1,6 @@
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import { App, PluginSettingTab, SettingDefinitionItem } from 'obsidian';
 import type BreadcrumbsPlugin from '../main';
+import { defaultSettings } from './settings';
 
 export class EBSettingTab extends PluginSettingTab {
   plugin: BreadcrumbsPlugin;
@@ -9,63 +10,46 @@ export class EBSettingTab extends PluginSettingTab {
     this.plugin = plugin;
   }
 
-  display(): void {
-    const { containerEl } = this;
-    containerEl.empty();
+  getSettingDefinitions(): SettingDefinitionItem[] {
+    return [
+      {
+        name: 'Show folder path',
+        desc: 'Show the folder chain (Folder › Subfolder) before the file name.',
+        control: { type: 'toggle', key: 'showFolderPath' },
+      },
+      {
+        name: 'Show file name',
+        desc: 'Show the current file name as a crumb.',
+        control: { type: 'toggle', key: 'showFileName' },
+      },
+      {
+        name: 'Max characters per crumb',
+        desc: 'Longer names are truncated with an ellipsis (…).',
+        control: {
+          type: 'number',
+          key: 'maxSegmentLength',
+          min: 1,
+          step: 1,
+          defaultValue: defaultSettings.maxSegmentLength,
+          validate: value => (value >= 1 ? undefined : 'Enter a number of at least 1.'),
+        },
+      },
+      {
+        name: 'Show in reading mode',
+        desc: 'Also show the breadcrumb bar in reading (preview) mode, following the scroll position.',
+        control: { type: 'toggle', key: 'showInReadingMode' },
+      },
+      {
+        name: 'Hide when there are no headings',
+        desc: 'Hide the bar completely for notes without any headings.',
+        control: { type: 'toggle', key: 'hideWhenNoHeadings' },
+      },
+    ];
+  }
 
-    new Setting(containerEl)
-      .setName('Show folder path')
-      .setDesc('Show the folder chain (Folder › Subfolder) before the file name.')
-      .addToggle(toggle =>
-        toggle.setValue(this.plugin.settings.showFolderPath).onChange(async value => {
-          this.plugin.settings.showFolderPath = value;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName('Show file name')
-      .setDesc('Show the current file name as a crumb.')
-      .addToggle(toggle =>
-        toggle.setValue(this.plugin.settings.showFileName).onChange(async value => {
-          this.plugin.settings.showFileName = value;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName('Max characters per crumb')
-      .setDesc('Longer names are truncated with an ellipsis (…).')
-      .addText(text =>
-        text
-          .setValue(String(this.plugin.settings.maxSegmentLength))
-          .onChange(async value => {
-            const parsed = parseInt(value, 10);
-            if (!Number.isNaN(parsed) && parsed > 0) {
-              this.plugin.settings.maxSegmentLength = parsed;
-              await this.plugin.saveSettings();
-            }
-          })
-      );
-
-    new Setting(containerEl)
-      .setName('Show in reading mode')
-      .setDesc('Also show the breadcrumb bar in reading (preview) mode, following the scroll position.')
-      .addToggle(toggle =>
-        toggle.setValue(this.plugin.settings.showInReadingMode).onChange(async value => {
-          this.plugin.settings.showInReadingMode = value;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName('Hide when there are no headings')
-      .setDesc('Hide the bar completely for notes without any headings.')
-      .addToggle(toggle =>
-        toggle.setValue(this.plugin.settings.hideWhenNoHeadings).onChange(async value => {
-          this.plugin.settings.hideWhenNoHeadings = value;
-          await this.plugin.saveSettings();
-        })
-      );
+  /** The base implementation persists to `plugin.settings`; refresh the bars on top of that. */
+  override async setControlValue(key: string, value: unknown): Promise<void> {
+    await super.setControlValue(key, value);
+    this.plugin.renderAll();
   }
 }

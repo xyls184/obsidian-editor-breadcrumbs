@@ -45,8 +45,6 @@ export class BreadcrumbsPlugin extends Plugin {
     };
     return ViewPlugin.fromClass(
       class {
-        // eslint-disable-next-line @typescript-eslint/no-empty-function
-        constructor() {}
         update(update: ViewUpdate) {
           if (update.selectionSet || update.docChanged) {
             scheduleRender();
@@ -117,13 +115,6 @@ export class BreadcrumbsPlugin extends Plugin {
       settings.maxSegmentLength = defaultSettings.maxSegmentLength;
     }
     this.settings = settings;
-  }
-
-  async saveSettings() {
-    await this.saveData(this.settings);
-    for (const bar of this.bars.values()) {
-      bar.render();
-    }
   }
 }
 
