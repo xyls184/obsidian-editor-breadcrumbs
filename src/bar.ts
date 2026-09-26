@@ -4,6 +4,17 @@ import { Crumb, computeEditHeadingTrail, computePreviewHeadingTrail, getPreviewE
 
 const SEPARATOR = '›';
 
+/**
+ * Fallback delay for the render gate. Chromium defers requestAnimationFrame
+ * while the window is hidden or occluded, so a boolean flag released only by
+ * rAF can stay set for the whole hidden phase and swallow every later render
+ * (the 1s poll then finds its snapshot already current and never re-schedules
+ * — cursor-follow freezes permanently). The 64ms timer opens the same gate
+ * whenever rAF does not arrive in time; when rAF arrives first (the normal
+ * visible case) the timer just observes an already-open gate.
+ */
+const GATE_FALLBACK_MS = 64;
+
 export class BreadcrumbBar {
   plugin: BreadcrumbsPlugin;
   leaf: WorkspaceLeaf;
@@ -26,14 +37,19 @@ export class BreadcrumbBar {
     this.scrollHandler = () => this.scheduleRender();
   }
 
-  /** Coalesce scroll-driven and poll-driven renders into a single rAF. */
+  /** Coalesce scroll-driven and poll-driven renders into one rAF — with a
+   *  timer fallback so the gate can never wedge while the window is hidden
+   *  (see GATE_FALLBACK_MS). */
   private scheduleRender() {
     if (this.rafPending) return;
     this.rafPending = true;
-    window.requestAnimationFrame(() => {
+    const run = () => {
+      if (!this.rafPending) return; // the rAF already rendered
       this.rafPending = false;
       this.render();
-    });
+    };
+    window.requestAnimationFrame(run);
+    window.setTimeout(run, GATE_FALLBACK_MS);
   }
 
   mount() {

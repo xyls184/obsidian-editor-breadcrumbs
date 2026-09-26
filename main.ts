@@ -34,14 +34,23 @@ export class BreadcrumbsPlugin extends Plugin {
   }
 
   private createTracker() {
+    // Same wedge hazard as BreadcrumbBar.scheduleRender: rAF callbacks are
+    // deferred while the window is hidden/occluded, and the one-shot
+    // `scheduled` flag would then swallow every later cursor move. The timer
+    // fallback guarantees the gate always opens again (see GATE_FALLBACK_MS
+    // in src/bar.ts); in the normal visible case the timer is a no-op.
+    const GATE_FALLBACK_MS = 64;
     let scheduled = false;
     const scheduleRender = () => {
       if (scheduled) return;
       scheduled = true;
-      window.requestAnimationFrame(() => {
+      const run = () => {
+        if (!scheduled) return; // the rAF already rendered
         scheduled = false;
         this.renderActive();
-      });
+      };
+      window.requestAnimationFrame(run);
+      window.setTimeout(run, GATE_FALLBACK_MS);
     };
     return ViewPlugin.fromClass(
       class {
