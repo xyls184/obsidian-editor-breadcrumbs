@@ -18,6 +18,7 @@ A breadcrumb bar sits at the top of the editor pane, following the cursor (edit 
 ## Features
 
 - Real-time trail: follows the cursor in edit mode, follows scrolling in reading mode — in reading mode the current heading is the one at the middle of the view. Works on long, virtualized documents.
+- **Skipped heading levels stay visible** (issue #1): when the structure jumps, e.g. `H1` straight to `H4`, the bar shows extra separators (`H1 text ›› H4 text`), one per missing level.
 - Left-click a heading crumb → the **sibling heading menu** (headings of the same level under the same parent, current one checked). Arrow-key navigation is built in.
 - Right-click a heading crumb → jump to it immediately.
 - Jumps land precisely in both modes; reading-mode jumps center the target and use Obsidian's own internal heading-scroll path.
@@ -93,6 +94,7 @@ VS Code 风格的 Obsidian 编辑器面包屑导航：
 ## 功能
 
 - 路径实时更新；阅读模式同样支持（以窗口正中为当前阅读位置，含超长虚拟化文档）。
+- **标题跳级可见**（issue #1）：层级跳跃时（如 `H1` 直接到 `H4`），面包屑会显示额外分隔符（`H1 文本 ›› H4 文本`），每缺一级多一个 `›`。
 - 左键标题段 → 弹出**同级标题菜单**（同一父标题下同层级的兄弟标题，当前项勾选），方向键导航原生支持。
 - 右键标题段 → 直接跳转到该标题。
 - 两种模式均精确落地；阅读模式把目标标题滚到窗口正中，走 Obsidian 官方内部跳转路径。

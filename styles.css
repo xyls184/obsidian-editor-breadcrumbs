@@ -28,6 +28,14 @@
   flex-shrink: 0;
 }
 
+/* Extra separators for skipped heading levels (issue #1): same color as the
+   normal separator (0.3 opacity was unreadable on light themes with
+   low-contrast screens); a slight letter-spacing keeps the repeated marks
+   individually countable. */
+.eb-sep.eb-sep-skip {
+  letter-spacing: 0.5px;
+}
+
 .eb-seg {
   flex-shrink: 0;
   max-width: 45%;

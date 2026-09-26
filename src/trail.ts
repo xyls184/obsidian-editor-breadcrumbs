@@ -10,6 +10,8 @@ export interface Crumb {
   line?: number;
   /** For heading crumbs in preview mode: the DOM heading element. */
   el?: HTMLElement;
+  /** Markdown heading level (1-6); the bar uses it to render skipped-level separators. */
+  level?: number;
 }
 
 /** Strip common inline markdown so crumbs read like plain text. */
@@ -48,6 +50,7 @@ export function computeEditHeadingTrail(app: { metadataCache: { getFileCache(f: 
     text: stripMarkdown(h.heading),
     kind: 'heading' as const,
     line: h.position.start.line,
+    level: h.level,
   }));
 }
 
@@ -282,6 +285,7 @@ function computePreviewHeadingTrailDom(app: { metadataCache: { getFileCache(f: T
     text: stripMarkdown(h.heading),
     kind: 'heading' as const,
     line: h.position.start.line,
+    level: h.level,
   }));
 }
 

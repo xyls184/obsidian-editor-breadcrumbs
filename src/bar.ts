@@ -4,6 +4,9 @@ import { Crumb, computeEditHeadingTrail, computePreviewHeadingTrail, getPreviewE
 
 const SEPARATOR = '›';
 
+/** Upper bound on extra separators: the level gap caps at H1 → H6. */
+const MAX_SKIP_SEPARATORS = 5;
+
 /**
  * Fallback delay for the render gate. Chromium defers requestAnimationFrame
  * while the window is hidden or occluded, so a boolean flag released only by
@@ -260,7 +263,7 @@ export class BreadcrumbBar {
     // when the visible content is identical (same memoization strategy as the
     // sticky-headings reference plugin). Class toggles above always run.
     const renderKey =
-      (visible ? crumbs.map(c => `${c.kind}:${c.text}:${c.line ?? ''}`).join('|') : '') +
+      (visible ? crumbs.map(c => `${c.kind}:${c.text}:${c.line ?? ''}:${c.level ?? ''}`).join('|') : '') +
       `#${settings.maxSegmentLength}`;
     if (renderKey === this.lastRenderKey) return;
     this.lastRenderKey = renderKey;
@@ -270,7 +273,25 @@ export class BreadcrumbBar {
 
     crumbs.forEach((crumb, index) => {
       if (index > 0) {
-        this.barEl.createSpan({ cls: 'eb-sep', text: SEPARATOR });
+        // Skipped heading levels (issue #1): H1 → H4 renders "›››" between the
+        // crumbs — one extra mark per missing level, so the jump is visible.
+        // Heading crumbs hang off a virtual root (the file crumb, and the
+        // folder chain behind it), treated as level 0: a document that opens
+        // with H5 is missing H1-H4 the same way H4 after H1 is missing H2/H3,
+        // so the gap shows against the file crumb too. Deepening only — the
+        // chain closing upward (H4 → H2) drops crumbs, never adds a gap.
+        const prev = crumbs[index - 1];
+        const baseLevel = prev.kind === 'heading' ? (prev.level ?? 1) : 0;
+        const gap =
+          crumb.kind === 'heading' &&
+          typeof crumb.level === 'number'
+            ? crumb.level - baseLevel - 1
+            : 0;
+        const sepCount = 1 + Math.min(Math.max(gap, 0), MAX_SKIP_SEPARATORS);
+        this.barEl.createSpan({
+          cls: sepCount > 1 ? 'eb-sep eb-sep-skip' : 'eb-sep',
+          text: SEPARATOR.repeat(sepCount),
+        });
       }
       const el = this.barEl.createSpan({
         cls: `eb-seg eb-seg-${crumb.kind} eb-clickable`,
