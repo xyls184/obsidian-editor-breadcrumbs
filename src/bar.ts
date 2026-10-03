@@ -1,6 +1,6 @@
 import { MarkdownView, Menu, TFile, WorkspaceLeaf } from 'obsidian';
 import type { BreadcrumbsPlugin } from '../main';
-import { Crumb, computeEditHeadingTrail, computePreviewHeadingTrail, getPreviewEl, scrollToPreviewHeading, stripMarkdown } from './trail';
+import { Crumb, computeEditHeadingTrail, computePreviewHeadingTrail, getEffectiveHeadings, getPreviewEl, scrollToPreviewHeading, stripMarkdown } from './trail';
 
 const SEPARATOR = '›';
 
@@ -130,7 +130,7 @@ export class BreadcrumbBar {
     } else {
       const cursor = this.view.editor?.getCursor('from');
       const line = cursor ? cursor.line : 0;
-      crumbs.push(...computeEditHeadingTrail(this.plugin.app, file, line));
+      crumbs.push(...computeEditHeadingTrail(this.plugin.app, file, line, this.view.editor));
     }
 
     return crumbs;
@@ -158,7 +158,9 @@ export class BreadcrumbBar {
     const file = this.view.file ?? this.view.previewMode.file;
     if (!file || crumb.line == null) return;
 
-    const headings = this.plugin.app.metadataCache.getFileCache(file)?.headings ?? [];
+    // Full list including text-recovered headings: a truncated cache must not
+    // hide later siblings (menus are user-initiated, so the scan is cheap).
+    const headings = getEffectiveHeadings(this.plugin.app, file, this.view.editor, Number.MAX_SAFE_INTEGER);
     const idx = headings.findIndex(h => h.position.start.line === crumb.line);
     if (idx < 0) return;
 

@@ -27,11 +27,104 @@ export function stripMarkdown(raw: string): string {
 }
 
 /**
+ * The part of a heading the trail needs. Structurally compatible with the
+ * cache's HeadingCache, so cache lists assign directly; text-derived entries
+ * carry only these fields.
+ */
+export interface HeadingRef {
+  level: number;
+  heading: string;
+  position: { start: { line: number } };
+}
+
+/** Editor surface the text extraction needs (CodeMirror-compatible). */
+export interface HeadingsSource {
+  lineCount(): number;
+  getLine(n: number): string;
+}
+
+/** Above this many lines the text scan is skipped (render-time budget). */
+const TEXT_SCAN_LINE_LIMIT = 8000;
+
+/**
+ * Extract ATX headings (`#`..`######`) straight from the editor document.
+ *
+ * This mirrors what the editor renders, not what the cache indexes: the
+ * metadata cache parser swallows the rest of a file after certain constructs
+ * (a math block whose closing `$$` is followed by text on the same line is
+ * enough — everything below stops being indexed, headings included), while
+ * the editor keeps rendering those headings normally. Skipped: frontmatter
+ * and fenced code blocks. Known gap: setext headings (underlined titles) are
+ * only ever recovered from the cache.
+ */
+export function extractHeadingsFromText(editor: HeadingsSource): HeadingRef[] {
+  const headings: HeadingRef[] = [];
+  const lineCount = editor.lineCount();
+  if (lineCount <= 0) return headings;
+  let i = 0;
+  // Frontmatter: a `---` fence on line 0; YAML comments may look like headings.
+  if (editor.getLine(0).trim() === '---') {
+    i = 1;
+    while (i < lineCount && !/^(---|\.\.\.)\s*$/.test(editor.getLine(i))) i++;
+    i++; // past the closing fence (or EOF)
+  }
+  let fenceChar = '';
+  let fenceLen = 0;
+  for (; i < lineCount; i++) {
+    const raw = editor.getLine(i);
+    const t = raw.replace(/\t/g, '    ');
+    const fence = t.match(/^ {0,3}(`{3,}|~{3,})/);
+    if (fence) {
+      const ch = fence[1][0];
+      const len = fence[1].length;
+      if (!fenceChar) {
+        fenceChar = ch;
+        fenceLen = len;
+      } else if (ch === fenceChar && len >= fenceLen && t.slice(fence[0].length).trim() === '') {
+        fenceChar = '';
+      }
+      continue;
+    }
+    if (fenceChar) continue;
+    const m = t.match(/^ {0,3}(#{1,6})(?:\s|$)/);
+    if (!m) continue;
+    headings.push({
+      heading: raw.replace(/^ {0,3}#{1,6}\s*/, ''),
+      level: m[1].length,
+      position: { start: { line: i } },
+    });
+  }
+  return headings;
+}
+
+/**
+ * Headings the bar should trust: the metadata cache extended with any
+ * headings the cache missed below its last entry. The cache truncation is
+ * always a suffix (the parser drops everything after the offending line), so
+ * a heading can only be missing strictly below the last cached one — that is
+ * the only region the text scan has to cover. `scanBelowLine` is the position
+ * the caller cares about (cursor / scroll line): when it is not past the last
+ * cached heading the chain cannot reach the missing region and the scan is
+ * skipped, which keeps healthy documents on the pure-cache fast path.
+ */
+export function getEffectiveHeadings(app: { metadataCache: { getFileCache(f: TFile): { headings?: HeadingCache[] } | null } }, file: TFile | null, editor: HeadingsSource | null | undefined, scanBelowLine: number): HeadingRef[] {
+  const cached: HeadingRef[] = file ? (app.metadataCache.getFileCache(file)?.headings ?? []) : [];
+  if (!editor || cached.length >= TEXT_SCAN_LINE_LIMIT) return cached;
+  const lastCached = cached.length > 0 ? cached[cached.length - 1].position.start.line : -1;
+  if (scanBelowLine <= lastCached) return cached; // chain cannot reach the missing region
+  if (editor.lineCount() - 1 <= lastCached) return cached; // nothing below the last cached heading
+  if (editor.lineCount() > TEXT_SCAN_LINE_LIMIT) return cached; // too large to scan per render
+  const scanned = extractHeadingsFromText(editor);
+  const extra = scanned.filter(h => h.position.start.line > lastCached);
+  return extra.length > 0 ? [...cached, ...extra] : cached;
+}
+
+/**
  * Build the current chain of headings for the cursor position, VS Code style:
  * one crumb per heading level, only the innermost current heading of each level.
  */
-export function headingChainFromCache(headings: HeadingCache[], cursorLine: number): HeadingCache[] {
-  const chain: HeadingCache[] = [];
+export function headingChainFromCache(headings: HeadingRef[], cursorLine: number): HeadingRef[] {
+  const chain: HeadingRef[] = [];
   for (const heading of headings) {
     if (heading.position.start.line > cursorLine) break;
     while (chain.length > 0 && chain[chain.length - 1].level >= heading.level) {
@@ -42,10 +135,10 @@ export function headingChainFromCache(headings: HeadingCache[], cursorLine: numb
   return chain;
 }
 
-/** Chain of headings for a cursor line, computed from the metadata cache. */
-export function computeEditHeadingTrail(app: { metadataCache: { getFileCache(f: TFile): { headings?: HeadingCache[] } | null } }, file: TFile | null, cursorLine: number): Crumb[] {
+/** Chain of headings for a cursor line; recovers a truncated cache from the editor text. */
+export function computeEditHeadingTrail(app: { metadataCache: { getFileCache(f: TFile): { headings?: HeadingCache[] } | null } }, file: TFile | null, cursorLine: number, editor?: HeadingsSource | null): Crumb[] {
   if (!file) return [];
-  const headings = app.metadataCache.getFileCache(file)?.headings ?? [];
+  const headings = getEffectiveHeadings(app, file, editor, cursorLine);
   return headingChainFromCache(headings, cursorLine).map(h => ({
     text: stripMarkdown(h.heading),
     kind: 'heading' as const,
@@ -187,23 +280,25 @@ const JUMP_CORRECT_MS = 250;
 export function computePreviewHeadingTrail(app: { metadataCache: { getFileCache(f: TFile): { headings?: HeadingCache[] } | null } }, view: MarkdownView): Crumb[] {
   const file = view.file;
   if (!file) return [];
-  const metaHeadings = app.metadataCache.getFileCache(file)?.headings ?? [];
-  if (metaHeadings.length === 0) return [];
 
   const centerLine = getPreviewCenterLine(view);
   if (centerLine != null) {
-    return headingChainFromCache(metaHeadings, centerLine).map(h => ({
+    const headings = getEffectiveHeadings(app, file, view.editor, centerLine);
+    return headingChainFromCache(headings, centerLine).map(h => ({
       text: stripMarkdown(h.heading),
       kind: 'heading' as const,
       line: h.position.start.line,
+      level: h.level,
     }));
   }
   const scrollLine = getPreviewScrollLine(view);
   if (scrollLine != null) {
-    return headingChainFromCache(metaHeadings, scrollLine + PREVIEW_LINE_EPSILON).map(h => ({
+    const headings = getEffectiveHeadings(app, file, view.editor, scrollLine + PREVIEW_LINE_EPSILON);
+    return headingChainFromCache(headings, scrollLine + PREVIEW_LINE_EPSILON).map(h => ({
       text: stripMarkdown(h.heading),
       kind: 'heading' as const,
       line: h.position.start.line,
+      level: h.level,
     }));
   }
   return computePreviewHeadingTrailDom(app, view);
@@ -212,7 +307,7 @@ export function computePreviewHeadingTrail(app: { metadataCache: { getFileCache(
 /**
  * Legacy fallback: reading mode renders only a window of the document around
  * the viewport (virtualized DOM), so the heading chain must come from the
- * metadata cache. The rendered DOM headings are matched against the metadata
+ * heading list. The rendered DOM headings are matched against the list
  * as a contiguous subsequence to locate the current window, then the chain is
  * rebuilt from the full heading list.
  */
@@ -221,7 +316,8 @@ function computePreviewHeadingTrailDom(app: { metadataCache: { getFileCache(f: T
   const file = view.file;
   if (!previewEl || !file) return [];
 
-  const metaHeadings = app.metadataCache.getFileCache(file)?.headings ?? [];
+  // Legacy path only — rare, so the full-list scan is always affordable here.
+  const metaHeadings = getEffectiveHeadings(app, file, view.editor, Number.MAX_SAFE_INTEGER);
   if (metaHeadings.length === 0) return [];
 
   const base = previewEl.getBoundingClientRect();
@@ -273,7 +369,7 @@ function computePreviewHeadingTrailDom(app: { metadataCache: { getFileCache(f: T
     }
   }
 
-  const chainResult: HeadingCache[] = [];
+  const chainResult: HeadingRef[] = [];
   for (let i = 0; i <= currentIndex && i < metaHeadings.length; i++) {
     while (chainResult.length > 0 && chainResult[chainResult.length - 1].level >= metaHeadings[i].level) {
       chainResult.pop();
@@ -307,8 +403,8 @@ async function settle(ms = PREVIEW_SETTLE_MS): Promise<void> {
   await new Promise(resolve => window.setTimeout(resolve, ms));
 }
 
-/** Current rendered heading window mapped to metadata indices, or null. */
-function matchPreviewWindow(metaHeadings: HeadingCache[], previewEl: HTMLElement, baseTop: number): { start: number; els: { el: HTMLElement; text: string }[] } | null {
+/** Current rendered heading window mapped to heading-list indices, or null. */
+function matchPreviewWindow(metaHeadings: HeadingRef[], previewEl: HTMLElement, baseTop: number): { start: number; els: { el: HTMLElement; text: string }[] } | null {
   const domHeadings = listPreviewHeadings(previewEl, baseTop);
   if (domHeadings.length === 0) return null;
   const metaText = metaHeadings.map(h => stripMarkdown(h.heading).replace(/\s+/g, ' ').trim());
@@ -414,7 +510,9 @@ async function scrollToPreviewHeadingLegacy(app: { metadataCache: { getFileCache
   const file = view.file;
   if (!previewEl || !file) return;
 
-  const headings = app.metadataCache.getFileCache(file)?.headings ?? [];
+  // Target may be a text-recovered heading (truncated cache) — scan when the
+  // target line sits below the last cached heading.
+  const headings = getEffectiveHeadings(app, file, view.editor, line);
   if (headings.length === 0) return;
 
   const normalize = (s: string) => stripMarkdown(s).replace(/\s+/g, ' ').trim();
