@@ -1,6 +1,6 @@
 {
   "name": "obsidian-editor-breadcrumbs",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "VS Code style breadcrumb trail (folder > file > headings) at the top of the editor.",
   "main": "main.js",
   "scripts": {

@@ -53,9 +53,10 @@ const TEXT_SCAN_LINE_LIMIT = 8000;
  * metadata cache parser swallows the rest of a file after certain constructs
  * (a math block whose closing `$$` is followed by text on the same line is
  * enough — everything below stops being indexed, headings included), while
- * the editor keeps rendering those headings normally. Skipped: frontmatter
- * and fenced code blocks. Known gap: setext headings (underlined titles) are
- * only ever recovered from the cache.
+ * the editor keeps rendering those headings normally. Skipped: frontmatter,
+ * fenced code blocks and `$$` math blocks (a `#`-leading line inside math is
+ * LaTeX content, not a heading the editor renders). Known gap: setext
+ * headings (underlined titles) are only ever recovered from the cache.
  */
 export function extractHeadingsFromText(editor: HeadingsSource): HeadingRef[] {
   const headings: HeadingRef[] = [];
@@ -70,6 +71,7 @@ export function extractHeadingsFromText(editor: HeadingsSource): HeadingRef[] {
   }
   let fenceChar = '';
   let fenceLen = 0;
+  let inMath = false;
   for (; i < lineCount; i++) {
     const raw = editor.getLine(i);
     const t = raw.replace(/\t/g, '    ');
@@ -86,6 +88,15 @@ export function extractHeadingsFromText(editor: HeadingsSource): HeadingRef[] {
       continue;
     }
     if (fenceChar) continue;
+    // Math blocks by `$$` parity: a line with an odd count toggles state
+    // (`$$` alone opens, `$$（text）` closes, `$$x=1$$` is even and stays out).
+    // Inline code spans are stripped first so a literal `$$` inside backticks
+    // cannot fake a toggle. A line that starts inside math is math content —
+    // never a heading — even when it carries the closing `$$`.
+    const startsInMath = inMath;
+    const mathDollars = (t.replace(/`[^`]*`/g, '').match(/\$\$/g) ?? []).length;
+    if (mathDollars % 2 === 1) inMath = !inMath;
+    if (startsInMath) continue;
     const m = t.match(/^ {0,3}(#{1,6})(?:\s|$)/);
     if (!m) continue;
     headings.push({
@@ -98,14 +109,22 @@ export function extractHeadingsFromText(editor: HeadingsSource): HeadingRef[] {
 }
 
 /**
- * Headings the bar should trust: the metadata cache extended with any
- * headings the cache missed below its last entry. The cache truncation is
- * always a suffix (the parser drops everything after the offending line), so
- * a heading can only be missing strictly below the last cached one — that is
- * the only region the text scan has to cover. `scanBelowLine` is the position
- * the caller cares about (cursor / scroll line): when it is not past the last
- * cached heading the chain cannot reach the missing region and the scan is
- * skipped, which keeps healthy documents on the pure-cache fast path.
+ * Headings the bar should trust: the metadata cache reconciled with an ATX
+ * scan of the editor document. The cache desync is *usually* a suffix (the
+ * parser drops everything after the offending line), but not always: the same
+ * poison line also breaks the parser's math-block state, so a later `$$` pair
+ * can make it swallow a middle region holding real headings while indexing
+ * `#`-leading math content it no longer recognizes as math. The scan therefore
+ * covers the whole document and the two lists are reconciled in line order:
+ * cache entries ahead of the scan are kept (setext headings, which the scan
+ * cannot see); at the first scan-ahead position the cache is provably desynced
+ * from there on and the editor scan takes over. `scanBelowLine` is the
+ * position the caller cares about (cursor / scroll line): when it is not past
+ * the last cached heading the chain cannot reach any missing region and the
+ * scan is skipped, which keeps healthy documents on the pure-cache fast path.
+ * Residual boundary: a cursor *inside* a mid-document swallowed region (at or
+ * above the last cached heading) still mirrors the core cache — and with it
+ * the outline panel — until the position moves past.
  */
 export function getEffectiveHeadings(app: { metadataCache: { getFileCache(f: TFile): { headings?: HeadingCache[] } | null } }, file: TFile | null, editor: HeadingsSource | null | undefined, scanBelowLine: number): HeadingRef[] {
   const cached: HeadingRef[] = file ? (app.metadataCache.getFileCache(file)?.headings ?? []) : [];
@@ -115,8 +134,28 @@ export function getEffectiveHeadings(app: { metadataCache: { getFileCache(f: TFi
   if (editor.lineCount() - 1 <= lastCached) return cached; // nothing below the last cached heading
   if (editor.lineCount() > TEXT_SCAN_LINE_LIMIT) return cached; // too large to scan per render
   const scanned = extractHeadingsFromText(editor);
-  const extra = scanned.filter(h => h.position.start.line > lastCached);
-  return extra.length > 0 ? [...cached, ...extra] : cached;
+  if (scanned.length === 0) return cached;
+  const merged: HeadingRef[] = [];
+  let ci = 0;
+  let si = 0;
+  while (ci < cached.length && si < scanned.length) {
+    const cl = cached[ci].position.start.line;
+    const sl = scanned[si].position.start.line;
+    if (cl === sl) {
+      // Same heading seen by both — keep the cache entry (it carries the full
+      // position data the scan does not).
+      merged.push(cached[ci]);
+      ci++;
+      si++;
+    } else if (cl < sl) {
+      merged.push(cached[ci]); // cache-only entry (setext) — keep
+      ci++;
+    } else {
+      // Scan-ahead: a real heading the cache missed — desync starts here.
+      return [...merged, ...scanned.slice(si)];
+    }
+  }
+  return [...merged, ...scanned.slice(si)];
 }
 
 /**
