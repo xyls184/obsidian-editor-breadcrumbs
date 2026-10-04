@@ -45,7 +45,7 @@ A breadcrumb bar sits at the top of the editor pane, following the cursor (edit 
 
 ## Installation
 
-Currently waiting for the Obsidian store to approve the submission; in the meantime, manual installation is the only option.
+**Editor Breadcrumbs is available in the official community plugin store**: open [the store page](https://community.obsidian.md/plugins/editor-breadcrumbs) or search "Editor Breadcrumbs" in **Settings → Community plugins → Browse**, then hit Install.
 
 ### Option A — Download the pre-built files (no build needed)
 
@@ -121,7 +121,7 @@ VS Code 风格的 Obsidian 编辑器面包屑导航：
 
 ## 安装
 
-正在等待obsidian商店通过审核，在此之前只能手动安装
+**本插件已上架 Obsidian 官方社区插件商店**：在 **设置 → 第三方插件 → 浏览** 中搜索 "Editor Breadcrumbs" 安装，或直接打开[商店页面](https://community.obsidian.md/plugins/editor-breadcrumbs)。
 
 ### 方式 A —— 下载预编译文件（无需编译）
 
