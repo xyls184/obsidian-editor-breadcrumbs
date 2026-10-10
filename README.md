@@ -1,4 +1,11 @@
 Developed with AI assistance (glm-5.3-flash & deepseek-v4.1-flash). · 本插件在 AI（glm-5.3-flash & deepseek-v4.1-flash）辅助下编写。
+
+> **Disclaimer · 免责声明**
+>
+> This project was made with wish coding: the author does not read or understand the source code and therefore makes no guarantee about its correctness or usability — use it at your own risk.
+>
+> 本项目为 wish coding 制作：作者看不懂项目代码，因此不对代码的可用性与正确性作任何保证，请自行评估风险后使用。
+
 中文说明在下方。
 
 # Editor Breadcrumbs
