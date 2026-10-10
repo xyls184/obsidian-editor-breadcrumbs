@@ -39,10 +39,32 @@
   padding: 0 6px 0 2px;
   background: transparent;
   border-bottom: none;
+  /* Match .view-header-title's metrics (Obsidian renders it at 90% of
+     --font-ui-small, line-height 1.3) so the trail's glyph axis lines up
+     with the native "Folder › File" text beside it. */
+  font-size: calc(var(--font-ui-small, 13px) * 0.9);
+  line-height: 1.3;
 }
 
+/* No percentage cap here: max-width resolves against the trail's own width,
+   which the header is already squeezing — the cap would re-clamp every crumb
+   to the same budget and defeat the collapse-first priority below. */
 .eb-bar.eb-in-header .eb-seg {
-  max-width: 30%;
+  max-width: none;
+}
+
+/* Separators yield too, so a fully collapsed older crumb leaves no dangling "›". */
+.eb-bar.eb-in-header .eb-sep {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Collapsing older crumbs fade out instead of leaving a clipped glyph sliver
+   (VS Code breadcrumb style). The current crumb never fades. */
+.eb-bar.eb-in-header .eb-seg:not(.eb-current) {
+  -webkit-mask-image: linear-gradient(90deg, #000 90%, transparent 100%);
+  mask-image: linear-gradient(90deg, #000 90%, transparent 100%);
 }
 
 .eb-sep {
@@ -60,11 +82,19 @@
 }
 
 .eb-seg {
-  flex-shrink: 0;
+  flex-shrink: 8;
+  min-width: 0;
   max-width: 45%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Space budget: older crumbs collapse first (down to nothing), the current
+   crumb keeps a readable floor and yields last. */
+.eb-current {
+  flex-shrink: 1;
+  min-width: 6ch;
 }
 
 .eb-seg-folder,
