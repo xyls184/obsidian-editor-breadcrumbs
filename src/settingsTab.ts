@@ -40,6 +40,11 @@ export class EBSettingTab extends PluginSettingTab {
         control: { type: 'toggle', key: 'showInReadingMode' },
       },
       {
+        name: 'Show heading trail in the tab header',
+        desc: 'Render the heading breadcrumbs inside the native tab title bar, right after the folder/file path (Obsidian 1.14+ header). Folder and file crumbs are omitted there because the native path already shows them.',
+        control: { type: 'toggle', key: 'showInTabHeader' },
+      },
+      {
         name: 'Hide when there are no headings',
         desc: 'Hide the bar completely for notes without any headings.',
         control: { type: 'toggle', key: 'hideWhenNoHeadings' },

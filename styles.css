@@ -27,6 +27,24 @@
   display: none;
 }
 
+/* Header mode: the trail lives inside Obsidian's .view-header-title-container,
+   right after the native "Folder › File" path. Inherit the header's ~32px row
+   instead of the standalone bar's 27px strip; shrink with an ellipsis per
+   crumb when the header runs out of room. */
+.eb-bar.eb-in-header {
+  height: auto;
+  align-self: center;
+  flex: 0 1 auto;
+  min-width: 0;
+  padding: 0 6px 0 2px;
+  background: transparent;
+  border-bottom: none;
+}
+
+.eb-bar.eb-in-header .eb-seg {
+  max-width: 30%;
+}
+
 .eb-sep {
   padding: 0 4px;
   opacity: 0.55;

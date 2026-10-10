@@ -9,6 +9,9 @@ export interface EBSettings {
   hideWhenNoHeadings: boolean;
   /** Show the bar in reading (preview) mode too. */
   showInReadingMode: boolean;
+  /** Render the heading trail inside the native tab header (after the file
+   *  path) instead of the dedicated bar above the content. */
+  showInTabHeader: boolean;
 }
 
 export const defaultSettings: EBSettings = {
@@ -17,4 +20,5 @@ export const defaultSettings: EBSettings = {
   maxSegmentLength: 20,
   hideWhenNoHeadings: false,
   showInReadingMode: true,
+  showInTabHeader: false,
 };

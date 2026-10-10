@@ -28,6 +28,8 @@ export class BreadcrumbBar {
   private pollTimer: number | undefined;
   private lastSnapshot = '';
   private lastRenderKey = '';
+  /** True while barEl lives inside the native tab header (header mode). */
+  private inHeader = false;
 
   constructor(plugin: BreadcrumbsPlugin, leaf: WorkspaceLeaf, view: MarkdownView) {
     this.plugin = plugin;
@@ -57,12 +59,35 @@ export class BreadcrumbBar {
 
   mount() {
     const contentEl = this.view.contentEl;
-    contentEl.prepend(this.barEl);
-    contentEl.addClass('eb-active');
+    this.applyPlacement();
     contentEl.addEventListener('scroll', this.scrollHandler, { capture: true, passive: true });
     // Safety net: scroll restoration at startup and programmatic scrolling in
     // the virtualized reading view do not always dispatch scroll events.
     this.pollTimer = window.setInterval(() => this.checkRefresh(), 1000);
+  }
+
+  /** Place the bar per settings: inside .view-header-title-container (after
+   *  the native folder/file path) or above the content. appendChild moves an
+   *  already-placed bar, so calling this again when the setting flips
+   *  mid-session re-homes it cleanly. Throws when the header is not ready so
+   *  syncBars retries on the next layout-change. */
+  private applyPlacement() {
+    const contentEl = this.view.contentEl;
+    const headerEl = this.plugin.settings.showInTabHeader
+      ? this.view.containerEl.querySelector<HTMLElement>(':scope > .view-header > .view-header-title-container')
+      : null;
+    if (this.plugin.settings.showInTabHeader && !headerEl) {
+      throw new Error('view header title container not ready');
+    }
+    if (headerEl) {
+      headerEl.appendChild(this.barEl);
+      this.barEl.addClass('eb-in-header');
+      this.inHeader = true;
+    } else {
+      contentEl.prepend(this.barEl);
+      this.barEl.removeClass('eb-in-header');
+      this.inHeader = false;
+    }
   }
 
   destroy() {
@@ -111,18 +136,22 @@ export class BreadcrumbBar {
 
     const { settings } = this.plugin;
 
-    if (settings.showFolderPath) {
-      let parent = file.parent;
-      const folders: Crumb[] = [];
-      while (parent && parent.path !== '/') {
-        folders.unshift({ text: parent.name, kind: 'folder' });
-        parent = parent.parent;
+    // Header mode: the native tab header already shows the folder/file path,
+    // so only the heading trail is rendered there.
+    if (!this.inHeader) {
+      if (settings.showFolderPath) {
+        let parent = file.parent;
+        const folders: Crumb[] = [];
+        while (parent && parent.path !== '/') {
+          folders.unshift({ text: parent.name, kind: 'folder' });
+          parent = parent.parent;
+        }
+        crumbs.push(...folders);
       }
-      crumbs.push(...folders);
-    }
 
-    if (settings.showFileName) {
-      crumbs.push({ text: file.basename, kind: 'file' });
+      if (settings.showFileName) {
+        crumbs.push({ text: file.basename, kind: 'file' });
+      }
     }
 
     if (this.view.getMode() === 'preview') {
@@ -246,6 +275,9 @@ export class BreadcrumbBar {
   render() {
     const { settings } = this.plugin;
 
+    // A settings flip moves the bar between the header and the content edge.
+    if (settings.showInTabHeader !== this.inHeader) this.applyPlacement();
+
     // Visibility rules.
     const file = this.view.file ?? this.view.previewMode.file;
     let visible = !!file;
@@ -259,7 +291,9 @@ export class BreadcrumbBar {
     }
 
     this.barEl.toggleClass('eb-hidden', !visible);
-    this.view.contentEl.toggleClass('eb-active', visible);
+    // eb-active shrinks the content by the bar height — bar mode only; the
+    // header-mode trail lives inside the native header, nothing to reserve.
+    this.view.contentEl.toggleClass('eb-active', visible && !this.inHeader);
 
     // Most scroll frames do not change the chain at all: skip the DOM rebuild
     // when the visible content is identical (same memoization strategy as the
@@ -274,7 +308,9 @@ export class BreadcrumbBar {
     if (!visible) return;
 
     crumbs.forEach((crumb, index) => {
-      if (index > 0) {
+      // Header mode opens with a separator so the trail reads as continuing
+      // the native "Folder › File" path; the standalone bar starts at the edge.
+      if (index > 0 || this.inHeader) {
         // Skipped heading levels (issue #1): H1 → H4 renders "›››" between the
         // crumbs — one extra mark per missing level, so the jump is visible.
         // Heading crumbs hang off a virtual root (the file crumb, and the
@@ -283,7 +319,7 @@ export class BreadcrumbBar {
         // so the gap shows against the file crumb too. Deepening only — the
         // chain closing upward (H4 → H2) drops crumbs, never adds a gap.
         const prev = crumbs[index - 1];
-        const baseLevel = prev.kind === 'heading' ? (prev.level ?? 1) : 0;
+        const baseLevel = prev?.kind === 'heading' ? (prev.level ?? 1) : 0;
         const gap =
           crumb.kind === 'heading' &&
           typeof crumb.level === 'number'

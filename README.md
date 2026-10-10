@@ -41,6 +41,7 @@ A breadcrumb bar sits at the top of the editor pane, following the cursor (edit 
 | Show file name | on | Show the file name crumb |
 | Max characters per crumb | 20 | Truncation length for the bar (menu entries are never truncated) |
 | Show in reading mode | on | Also show the bar in reading mode, following the scroll position |
+| Show heading trail in the tab header | off | Render the heading trail inside the native tab title bar, right after the `Folder › File` path (folder/file crumbs are omitted there — the native path already shows them) |
 | Hide when there are no headings | off | Hide the bar entirely for notes without headings |
 
 ## Installation
@@ -117,6 +118,7 @@ VS Code 风格的 Obsidian 编辑器面包屑导航：
 | Show file name | 开 | 是否显示文件名段 |
 | Max characters per crumb | 20 | 面包屑栏每段最大字符数（菜单内不截断） |
 | Show in reading mode | 开 | 阅读模式是否也显示面包屑（跟随滚动） |
+| Show heading trail in the tab header | 关 | 把标题导航渲染进 Obsidian 原生标签页标题栏（`文件夹 › 文件名` 之后）；该模式下不再重复显示路径段，因为原生标题栏已包含 |
 | Hide when there are no headings | 关 | 无标题的笔记是否隐藏整条面包屑 |
 
 ## 安装
