@@ -7,6 +7,11 @@
   box-sizing: border-box;
   height: 27px;
   flex-shrink: 0;
+  /* Paint above full-leaf decorative overlays some themes draw on
+     .workspace-leaf-content::before (e.g. Blue Topaz's page background).
+     Obsidian 1.14 stopped positioning .view-content, so without this the
+     theme overlay sits above the static bar and swallows every click. */
+  position: relative;
   padding: 0 12px;
   font-size: var(--font-ui-smaller, 12px);
   line-height: 1.4;
