@@ -105,7 +105,8 @@ export class BreadcrumbsPlugin extends Plugin {
   async loadSettings() {
     // The legacy pre-1.0.7 flag is destructured out so it never reaches the
     // settings object, and the stored data matches the current schema on save.
-    const { followViewTop: legacyFollowViewTop, ...raw } = (await this.loadData()) as Partial<EBSettings> & { followViewTop?: unknown };
+    // loadData() returns null on a fresh install (no data.json yet).
+    const { followViewTop: legacyFollowViewTop, ...raw } = ((await this.loadData()) ?? {}) as Partial<EBSettings> & { followViewTop?: unknown };
     const settings: EBSettings = { ...defaultSettings, ...raw };
     if (legacyFollowViewTop === true) {
       settings.editFollowView = true;
